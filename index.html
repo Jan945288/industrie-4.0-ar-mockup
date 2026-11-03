@@ -348,32 +348,6 @@
     .live-pill[data-state="waiting"] { background: #fef3c7; color: #92400e; }
     .live-pill[data-state="error"] { background: #fee2e2; color: #991b1b; }
 
-    /* Auch ohne Hiro-Marker sichtbar: Verbindung und letzter Messwert */
-    #vibration-monitor {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 30;
-      width: min(285px, calc(100vw - 32px));
-      padding: 12px 14px;
-      color: white;
-      border-radius: 14px;
-      background: rgba(9, 28, 48, 0.88);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, .24);
-      backdrop-filter: blur(7px);
-      font-size: 13px;
-    }
-    .monitor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .monitor-head strong { font-size: 14px; }
-    #monitor-value { font-size: 27px; font-weight: 750; margin-top: 6px; font-variant-numeric: tabular-nums; }
-    #monitor-message { font-size: 11px; line-height: 1.35; opacity: .85; margin-top: 6px; overflow-wrap: anywhere; }
-    #monitor-status { font-size: 11px; font-weight: bold; color: #fcd34d; }
-    #monitor-status[data-state="live"] { color: #86efac; }
-    #monitor-status[data-state="error"] { color: #fca5a5; }
-    @media (max-width: 600px) {
-      #vibration-monitor { top: auto; bottom: 52px; right: 10px; width: min(240px, calc(100vw - 20px)); }
-      #monitor-value { font-size: 23px; }
-    }
 
   </style>
 </head>
@@ -607,15 +581,6 @@
 
 
 
-  <!-- Kleine Live-Anzeige auch ohne erkannten Hiro-Marker -->
-  <aside id="vibration-monitor" aria-label="Live-Vibration und Verbindungsstatus">
-    <div class="monitor-head">
-      <strong>PowerHouse · P-101</strong>
-      <span id="monitor-status" data-state="waiting">Verbinde…</span>
-    </div>
-    <div id="monitor-value">–</div>
-    <div id="monitor-message">Verbinde zum HiveMQ-MQTT-Broker…</div>
-  </aside>
 
   <script>
 
@@ -884,21 +849,17 @@
     const vibrationValue = document.getElementById("vibration-value");
     const vibrationUpdated = document.getElementById("vibration-updated");
     const vibrationStatus = document.getElementById("vibration-status");
-    const monitorValue = document.getElementById("monitor-value");
-    const monitorStatus = document.getElementById("monitor-status");
-    const monitorMessage = document.getElementById("monitor-message");
 
     let lastVibrationAt = 0;
     let receivedVibration = false;
     let mqttConnected = false;
     let mqttSubscribed = false;
 
-    function setVibrationStatus(state, label, message) {
+    // Die MQTT-Daten laufen weiter, aber die Anzeige liegt nur im AR-Overlay.
+    // Das Overlay selbst wird ausschließlich bei markerFound eingeblendet.
+    function setVibrationStatus(state, label) {
       vibrationStatus.dataset.state = state;
       vibrationStatus.textContent = label;
-      monitorStatus.dataset.state = state;
-      monitorStatus.textContent = label;
-      if (message) monitorMessage.textContent = message;
     }
 
     // Sowohl reine Werte (z. B. "2.354") als auch JSON {value: ...} akzeptieren.
@@ -924,7 +885,6 @@
       lastVibrationAt = Date.now();
       receivedVibration = true;
       vibrationValue.textContent = formatted;
-      monitorValue.textContent = formatted;
       vibrationUpdated.textContent = "Letzter Messwert: " + now.toLocaleTimeString("de-DE");
       setVibrationStatus("live", "Live", "MQTT: " + MQTT_TOPIC + " · " + now.toLocaleTimeString("de-DE"));
     }
