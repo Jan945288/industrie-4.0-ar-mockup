@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Industrie 4.0 AR Mockup - Zwischenlager</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+
+  <!-- AR.js -->
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    /* Kamera */
+    video,
+    canvas {
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: contain !important;
+    }
+
+    /* Gesamtes AR-Overlay */
+    #overlay {
+      display: none;
+
+      position: fixed;
+      top: 20px;
+      left: 20px;
+
+      z-index: 10;
+
+      width: 330px;
+
+      color: #18364a;
+    }
+
+    /* Überschrift */
+    .header {
+      background: rgba(8, 82, 125, 0.95);
+      color: white;
+
+      padding: 14px 18px;
+
+      border-radius: 14px;
+
+      margin-bottom: 10px;
+
+      box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .header p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    /* Hauptbox */
+    .info-card {
+      background: rgba(255,255,255,0.94);
+
+      padding: 18px;
+
+      border-radius: 14px;
+
+      box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+
+      backdrop-filter: blur(4px);
+    }
+
+    /* Einzelne Zeile */
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      padding: 10px 0;
+
+      border-bottom: 1px solid #d7e0e5;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      font-weight: normal;
+    }
+
+    .info-value {
+      font-weight: bold;
+    }
+
+    /* Betriebsstatus */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      color: #16a34a;
+    }
+
+    .status-dot {
+      width: 14px;
+      height: 14px;
+
+      border-radius: 50%;
+
+      background: #16a34a;
+    }
+
+    /* Füllstand */
+    .fill-container {
+      margin-top: 8px;
+
+      width: 100%;
+      height: 10px;
+
+      background: #dbe5eb;
+
+      border-radius: 10px;
+
+      overflow: hidden;
+    }
+
+    .fill-bar {
+      height: 100%;
+
+      width: 75%;
+
+      background: #0ea5d8;
+
+      border-radius: 10px;
+    }
+
+    /* Fehlerbox */
+    #error-button {
+      width: 100%;
+
+      margin-top: 12px;
+
+      padding: 14px 16px;
+
+      border: none;
+      border-radius: 14px;
+
+      background: #e5232d;
+
+      color: white;
+
+      cursor: pointer;
+
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      text-align: left;
+
+      box-shadow: 0 5px 15px rgba(229,35,45,0.35);
+    }
+
+    .error-icon {
+      font-size: 28px;
+    }
+
+    .error-text {
+      flex: 1;
+    }
+
+    .error-title {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .error-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .error-arrow {
+      font-size: 25px;
+    }
+
+    /* Fehlerdetails */
+    #error-details {
+      display: none;
+
+      margin-top: 10px;
+
+      background: rgba(255,255,255,0.97);
+
+      border: 2px solid #e5232d;
+
+      border-radius: 14px;
+
+      padding: 16px;
+
+      box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+    }
+
+    .error-details-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      margin-bottom: 14px;
+    }
+
+    .error-details-header h2 {
+      margin: 0;
+
+      color: #e5232d;
+
+      font-size: 19px;
+    }
+
+    #close-error {
+      border: none;
+      background: none;
+
+      font-size: 24px;
+
+      cursor: pointer;
+
+      color: #555;
+    }
+
+    .error-detail-row {
+      margin-bottom: 10px;
+    }
+
+    .error-detail-label {
+      font-size: 13px;
+      color: #607685;
+    }
+
+    .error-detail-value {
+      font-weight: bold;
+      margin-top: 2px;
+    }
+
+    /* Marker-Status nur zum Testen */
+    #marker-info {
+      position: fixed;
+
+      bottom: 15px;
+      left: 50%;
+
+      transform: translateX(-50%);
+
+      z-index: 20;
+
+      background: rgba(0,0,0,0.6);
+
+      color: white;
+
+      padding: 8px 14px;
+
+      border-radius: 10px;
+
+      font-size: 13px;
+    }
+
+    /* Smartphone */
+    @media (max-width: 600px) {
+
+      #overlay {
+        top: 10px;
+        left: 10px;
+
+        width: min(310px, calc(100vw - 20px));
+      }
+
+      .header {
+        padding: 10px 14px;
+      }
+
+      .header h1 {
+        font-size: 18px;
+      }
+
+      .info-card {
+        padding: 14px;
+      }
+
+      .info-row {
+        font-size: 14px;
+      }
+    }
+
+
+    /* Live-Daten aus Node-RED / WebSocket */
+    .vibration-row {
+      background: #eef8fc;
+      border: 1px solid #c5e4f1;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0 4px;
+    }
+    .vibration-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      color: #426275;
+      margin-bottom: 6px;
+    }
+    .vibration-number {
+      font-size: 29px;
+      line-height: 1.15;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      color: #0b527d;
+      overflow-wrap: anywhere;
+    }
+    .vibration-meta { font-size: 12px; margin-top: 6px; color: #607685; }
+    .live-pill {
+      background: #e2e8f0;
+      color: #475569;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    .live-pill[data-state="live"] { background: #dcfce7; color: #166534; }
+    .live-pill[data-state="waiting"] { background: #fef3c7; color: #92400e; }
+    .live-pill[data-state="error"] { background: #fee2e2; color: #991b1b; }
+
+    /* Auch ohne Hiro-Marker sichtbar: Verbindung und letzter Messwert */
+    #vibration-monitor {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 30;
+      width: min(285px, calc(100vw - 32px));
+      padding: 12px 14px;
+      color: white;
+      border-radius: 14px;
+      background: rgba(9, 28, 48, 0.88);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(7px);
+      font-size: 13px;
+    }
+    .monitor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .monitor-head strong { font-size: 14px; }
+    #monitor-value { font-size: 27px; font-weight: 750; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    #monitor-message { font-size: 11px; line-height: 1.35; opacity: .85; margin-top: 6px; overflow-wrap: anywhere; }
+    #monitor-status { font-size: 11px; font-weight: bold; color: #fcd34d; }
+    #monitor-status[data-state="live"] { color: #86efac; }
+    #monitor-status[data-state="error"] { color: #fca5a5; }
+    @media (max-width: 600px) {
+      #vibration-monitor { top: auto; bottom: 52px; right: 10px; width: min(240px, calc(100vw - 20px)); }
+      #monitor-value { font-size: 23px; }
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!-- AR Kamera -->
+  <a-scene
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true"
+    embedded
+
+    arjs="
+      sourceType: webcam;
+      facingMode: environment;
+      sourceWidth: 1280;
+      sourceHeight: 720;
+      displayWidth: 1280;
+      displayHeight: 720;
+      debugUIEnabled: false;
+    ">
+
+    <!-- Hiro Marker -->
+    <a-marker preset="hiro" id="hiro-marker"></a-marker>
+
+    <!-- Kamera -->
+    <a-entity camera></a-entity>
+
+  </a-scene>
+
+
+  <!-- AR Benutzeroberfläche -->
+  <div id="overlay">
+
+    <!-- Modulname -->
+    <div class="header">
+
+      <h1>Zwischenlager – ZL-01</h1>
+
+      <p>AR Anlagenübersicht</p>
+
+    </div>
+
+
+    <!-- Informationen -->
+    <div class="info-card">
+
+      <!-- Echtes Live-Signal vom Milo OPC-UA Server über Node-RED WebSocket -->
+      <div class="vibration-row" aria-label="Vibrationsmessung">
+        <div class="vibration-heading">
+          <strong>Vibration P-101</strong>
+          <span class="live-pill" id="vibration-status" data-state="waiting">Verbinde…</span>
+        </div>
+        <div class="vibration-number" id="vibration-value">–</div>
+        <div class="vibration-meta" id="vibration-updated">Noch kein Messwert empfangen</div>
+      </div>
+
+
+      <!-- Anlagenstatus -->
+      <div class="info-row">
+
+        <span class="info-label">
+          Anlagenstatus
+        </span>
+
+        <span class="info-value status">
+
+          <span class="status-dot"></span>
+
+          Betrieb
+
+        </span>
+
+      </div>
+
+
+      <!-- Füllstand -->
+      <div class="info-row"
+           style="display:block;">
+
+        <div style="
+          display:flex;
+          justify-content:space-between;
+        ">
+
+          <span>
+            Füllstand Lagerturm
+          </span>
+
+          <strong id="fill-level">
+            75 %
+          </strong>
+
+        </div>
+
+        <div class="fill-container">
+
+          <div
+            id="fill-bar"
+            class="fill-bar">
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- Lift -->
+      <div class="info-row">
+
+        <span>
+          Position Lift
+        </span>
+
+        <span
+          id="lift-position"
+          class="info-value">
+
+          Position 2
+
+        </span>
+
+      </div>
+
+
+      <!-- Fehler -->
+      <button id="error-button">
+
+        <div class="error-icon">
+          ⚠
+        </div>
+
+        <div class="error-text">
+
+          <div class="error-title">
+            Fehler
+          </div>
+
+          <div class="error-subtitle">
+            Tippen für Details
+          </div>
+
+        </div>
+
+        <div class="error-arrow">
+          ›
+        </div>
+
+      </button>
+
+    </div>
+
+
+    <!-- Fehlerdetails -->
+    <div id="error-details">
+
+      <div class="error-details-header">
+
+        <h2>
+          ⚠ Fehlerdetails
+        </h2>
+
+        <button id="close-error">
+          ×
+        </button>
+
+      </div>
+
+
+      <div class="error-detail-row">
+
+        <div class="error-detail-label">
+          Fehlercode
+        </div>
+
+        <div
+          id="error-code"
+          class="error-detail-value">
+
+          F-204
+
+        </div>
+
+      </div>
+
+
+      <div class="error-detail-row">
+
+        <div class="error-detail-label">
+          Meldung
+        </div>
+
+        <div
+          id="error-message"
+          class="error-detail-value">
+
+          Lift blockiert
+
+        </div>
+
+      </div>
+
+
+      <div class="error-detail-row">
+
+        <div class="error-detail-label">
+          Mögliche Ursache
+        </div>
+
+        <div
+          id="error-cause"
+          class="error-detail-value">
+
+          Palette steht nicht korrekt.
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- nur zum Testen -->
+  <div id="marker-info">
+
+    Marker noch nicht erkannt
+
+  </div>
+
+
+
+  <!-- Kleine Live-Anzeige auch ohne erkannten Hiro-Marker -->
+  <aside id="vibration-monitor" aria-label="Live-Vibration und Verbindungsstatus">
+    <div class="monitor-head">
+      <strong>PowerHouse · P-101</strong>
+      <span id="monitor-status" data-state="waiting">Verbinde…</span>
+    </div>
+    <div id="monitor-value">–</div>
+    <div id="monitor-message">Verbinde zum Node-RED-WebSocket…</div>
+  </aside>
+
+  <script>
+
+    /*
+     * --------------------------------------------------
+     * MOCKDATEN
+     * --------------------------------------------------
+     *
+     * Hier können später echte SPS/API-Daten
+     * eingesetzt werden.
+     */
+
+    const moduleData = {
+
+      moduleId: "ZL-01",
+
+      moduleName: "Zwischenlager",
+
+      status: "Betrieb",
+
+      fillLevel: 75,
+
+      liftPosition: 2,
+
+      error: {
+
+        active: true,
+
+        code: "F-204",
+
+        message: "Lift blockiert",
+
+        cause: "Palette steht nicht korrekt."
+
+      }
+
+    };
+
+
+    /*
+     * HTML Elemente
+     */
+
+    const overlay =
+      document.getElementById("overlay");
+
+    const marker =
+      document.getElementById("hiro-marker");
+
+    const markerInfo =
+      document.getElementById("marker-info");
+
+    const errorButton =
+      document.getElementById("error-button");
+
+    const errorDetails =
+      document.getElementById("error-details");
+
+    const closeError =
+      document.getElementById("close-error");
+
+
+    /*
+     * Daten anzeigen
+     */
+
+    function updateData() {
+
+      document.getElementById(
+        "fill-level"
+      ).textContent =
+        moduleData.fillLevel + " %";
+
+
+      document.getElementById(
+        "fill-bar"
+      ).style.width =
+        moduleData.fillLevel + "%";
+
+
+      document.getElementById(
+        "lift-position"
+      ).textContent =
+        "Position " +
+        moduleData.liftPosition;
+
+
+      /*
+       * Fehler
+       */
+
+      if (moduleData.error.active) {
+
+        errorButton.style.display =
+          "flex";
+
+        document.getElementById(
+          "error-code"
+        ).textContent =
+          moduleData.error.code;
+
+        document.getElementById(
+          "error-message"
+        ).textContent =
+          moduleData.error.message;
+
+        document.getElementById(
+          "error-cause"
+        ).textContent =
+          moduleData.error.cause;
+
+      }
+
+      else {
+
+        errorButton.style.display =
+          "none";
+
+      }
+
+    }
+
+
+    /*
+     * Marker wurde erkannt
+     */
+
+    marker.addEventListener(
+      "markerFound",
+
+      () => {
+
+        console.log(
+          "Zwischenlager Marker erkannt"
+        );
+
+        updateData();
+
+        overlay.style.display =
+          "block";
+
+        markerInfo.textContent =
+          "ZL-01 erkannt";
+
+      }
+
+    );
+
+
+    /*
+     * Marker verloren
+     */
+
+    marker.addEventListener(
+      "markerLost",
+
+      () => {
+
+        console.log(
+          "Marker verloren"
+        );
+
+        overlay.style.display =
+          "none";
+
+        errorDetails.style.display =
+          "none";
+
+        markerInfo.textContent =
+          "Marker nicht sichtbar";
+
+      }
+
+    );
+
+
+    /*
+     * Fehler öffnen
+     */
+
+    errorButton.addEventListener(
+      "click",
+
+      () => {
+
+        errorDetails.style.display =
+          "block";
+
+      }
+
+    );
+
+
+    /*
+     * Fehler schließen
+     */
+
+    closeError.addEventListener(
+      "click",
+
+      () => {
+
+        errorDetails.style.display =
+          "none";
+
+      }
+
+    );
+
+
+    /*
+     * --------------------------------------------------
+     * TESTFUNKTIONEN
+     * --------------------------------------------------
+     *
+     * In der Browser-Konsole:
+     *
+     * fireEventMarkerFound()
+     *
+     * fireEventMarkerLost()
+     *
+     */
+
+
+    window.fireEventMarkerFound =
+      () => {
+
+        const event =
+          new CustomEvent(
+            "markerFound"
+          );
+
+        marker.dispatchEvent(
+          event
+        );
+
+      };
+
+
+    window.fireEventMarkerLost =
+      () => {
+
+        const event =
+          new CustomEvent(
+            "markerLost"
+          );
+
+        marker.dispatchEvent(
+          event
+        );
+
+      };
+
+
+
+    /* --------------------------------------------------
+       LIVE-VIBRATION: Node-RED WebSocket /ws/vibration
+       Unterstützt Zahlen als Text und JSON mit {value: ...}.
+       Konfigurierbare URL: ?ws=wss%3A%2F%2Fbeispiel.de%2Fws%2Fvibration
+       -------------------------------------------------- */
+    const defaultWebSocketURL = "ws://10.149.41.231:1880/ws/vibration";
+    const wsParameter = new URLSearchParams(window.location.search).get("ws");
+    const webSocketURL = (wsParameter && /^wss?:\/\//i.test(wsParameter))
+      ? wsParameter : defaultWebSocketURL;
+
+    const vibrationValue = document.getElementById("vibration-value");
+    const vibrationUpdated = document.getElementById("vibration-updated");
+    const vibrationStatus = document.getElementById("vibration-status");
+    const monitorValue = document.getElementById("monitor-value");
+    const monitorStatus = document.getElementById("monitor-status");
+    const monitorMessage = document.getElementById("monitor-message");
+
+    let vibrationSocket = null;
+    let retryTimer = null;
+    let lastVibrationAt = 0;
+    let receivedVibration = false;
+
+    function setVibrationStatus(state, label, message) {
+      vibrationStatus.dataset.state = state;
+      vibrationStatus.textContent = label;
+      monitorStatus.dataset.state = state;
+      monitorStatus.textContent = label;
+      if (message) monitorMessage.textContent = message;
+    }
+
+    function vibrationNumberFromMessage(rawData) {
+      let data = rawData;
+      try { data = JSON.parse(rawData); } catch (_) { /* reiner Zahlentext */ }
+      if (data && typeof data === "object") {
+        if (data.value !== undefined) data = data.value;
+        else if (data.payload !== undefined) data = data.payload;
+        else return null;
+      }
+      if (typeof data !== "number" && typeof data !== "string") return null;
+      if (typeof data === "string" && data.trim() === "") return null;
+      const number = Number(data);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function renderVibration(number) {
+      const formatted = number.toLocaleString("de-DE", {
+        minimumFractionDigits: 3, maximumFractionDigits: 3
+      });
+      const now = new Date();
+      lastVibrationAt = Date.now();
+      receivedVibration = true;
+      vibrationValue.textContent = formatted;
+      monitorValue.textContent = formatted;
+      vibrationUpdated.textContent = "Letzter Messwert: " + now.toLocaleTimeString("de-DE");
+      setVibrationStatus("live", "Live", "Messwerte werden empfangen · " + now.toLocaleTimeString("de-DE"));
+    }
+
+    function connectVibrationWebSocket() {
+      if (window.location.protocol === "https:" && webSocketURL.startsWith("ws://")) {
+        setVibrationStatus("error", "HTTPS / WSS", "Diese HTTPS-Seite benötigt einen verschlüsselten wss://-Endpunkt. Alternativ lokal über http://localhost testen.");
+        return;
+      }
+      try {
+        setVibrationStatus("waiting", "Verbinde…", "Verbinde mit " + webSocketURL);
+        vibrationSocket = new WebSocket(webSocketURL);
+      } catch (error) {
+        setVibrationStatus("error", "Ungültige URL", "WebSocket-Adresse prüfen: " + error.message);
+        return;
+      }
+
+      vibrationSocket.onopen = () => {
+        setVibrationStatus("waiting", "Verbunden", "WebSocket verbunden · warte auf Vibrationsdaten");
+      };
+      vibrationSocket.onmessage = (event) => {
+        const value = vibrationNumberFromMessage(event.data);
+        if (value === null) {
+          console.warn("Unbekanntes Vibrationsdatenformat:", event.data);
+          return;
+        }
+        renderVibration(value);
+      };
+      vibrationSocket.onerror = () => {
+        setVibrationStatus("error", "Fehler", "Keine WebSocket-Verbindung. Pi, Port 1880 und Node-RED-Deploy prüfen.");
+      };
+      vibrationSocket.onclose = () => {
+        if (retryTimer) clearTimeout(retryTimer);
+        setVibrationStatus("error", "Getrennt", "WebSocket getrennt · neuer Versuch in 3 Sekunden");
+        retryTimer = setTimeout(connectVibrationWebSocket, 3000);
+      };
+    }
+
+    // Keine alten Werte als aktuelle Live-Messung ausgeben.
+    setInterval(() => {
+      if (receivedVibration && Date.now() - lastVibrationAt > 10000 &&
+          vibrationStatus.dataset.state === "live") {
+        setVibrationStatus("waiting", "Keine Daten", "Seit über 10 Sekunden kein neuer Vibrationswert");
+      }
+    }, 1000);
+    connectVibrationWebSocket();
+
+  </script>
+
+</body>
+
+</html>
+
+<!-- GitHub Pages Neustart -->
