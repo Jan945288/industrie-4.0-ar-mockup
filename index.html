@@ -155,6 +155,7 @@
 
     /* Fehlerbox */
     #error-button {
+      display: none;
       width: 100%;
 
       margin-top: 12px;
@@ -259,27 +260,6 @@
       margin-top: 2px;
     }
 
-    /* Marker-Status nur zum Testen */
-    #marker-info {
-      position: fixed;
-
-      bottom: 15px;
-      left: 50%;
-
-      transform: translateX(-50%);
-
-      z-index: 20;
-
-      background: rgba(0,0,0,0.6);
-
-      color: white;
-
-      padding: 8px 14px;
-
-      border-radius: 10px;
-
-      font-size: 13px;
-    }
 
     /* Smartphone */
     @media (max-width: 600px) {
@@ -527,7 +507,7 @@
           id="error-code"
           class="error-detail-value">
 
-          F-204
+          MQTT-001
 
         </div>
 
@@ -544,7 +524,7 @@
           id="error-message"
           class="error-detail-value">
 
-          Lift blockiert
+          Keine Vibrationsdaten
 
         </div>
 
@@ -561,7 +541,7 @@
           id="error-cause"
           class="error-detail-value">
 
-          Palette steht nicht korrekt.
+          MQTT-Daten fehlen oder sind veraltet.
 
         </div>
 
@@ -570,23 +550,11 @@
     </div>
 
   </div>
-
-
-  <!-- nur zum Testen -->
-  <div id="marker-info">
-
-    Marker noch nicht erkannt
-
-  </div>
-
-
-
-
-  <script>
+<script>
 
     /*
      * --------------------------------------------------
-     * MOCKDATEN
+     * MOCKDATEN (Füllstand/Lift; Fehlerstatus kommt jetzt von MQTT)
      * --------------------------------------------------
      *
      * Hier können später echte SPS/API-Daten
@@ -607,13 +575,13 @@
 
       error: {
 
-        active: true,
+        active: false,
 
-        code: "F-204",
+        code: "MQTT-001",
 
-        message: "Lift blockiert",
+        message: "Keine Vibrationsdaten empfangen",
 
-        cause: "Palette steht nicht korrekt."
+        cause: "Der letzte gültige MQTT-Messwert ist mindestens 10 Sekunden alt."
 
       }
 
@@ -629,9 +597,6 @@
 
     const marker =
       document.getElementById("hiro-marker");
-
-    const markerInfo =
-      document.getElementById("marker-info");
 
     const errorButton =
       document.getElementById("error-button");
@@ -668,38 +633,8 @@
         moduleData.liftPosition;
 
 
-      /*
-       * Fehler
-       */
-
-      if (moduleData.error.active) {
-
-        errorButton.style.display =
-          "flex";
-
-        document.getElementById(
-          "error-code"
-        ).textContent =
-          moduleData.error.code;
-
-        document.getElementById(
-          "error-message"
-        ).textContent =
-          moduleData.error.message;
-
-        document.getElementById(
-          "error-cause"
-        ).textContent =
-          moduleData.error.cause;
-
-      }
-
-      else {
-
-        errorButton.style.display =
-          "none";
-
-      }
+      // Fehleranzeige hängt ausschließlich davon ab, ob aktuelle MQTT-Daten vorliegen.
+      refreshMQTTHealth();
 
     }
 
@@ -721,9 +656,6 @@
 
         overlay.style.display =
           "block";
-
-        markerInfo.textContent =
-          "ZL-01 erkannt";
 
       }
 
@@ -748,9 +680,6 @@
 
         errorDetails.style.display =
           "none";
-
-        markerInfo.textContent =
-          "Marker nicht sichtbar";
 
       }
 
@@ -850,6 +779,8 @@
     const vibrationUpdated = document.getElementById("vibration-updated");
     const vibrationStatus = document.getElementById("vibration-status");
 
+    const MQTT_DATA_TIMEOUT_MS = 10000;
+    const mqttStartAt = Date.now();
     let lastVibrationAt = 0;
     let receivedVibration = false;
     let mqttConnected = false;
@@ -860,6 +791,34 @@
     function setVibrationStatus(state, label) {
       vibrationStatus.dataset.state = state;
       vibrationStatus.textContent = label;
+    }
+
+    // Der rote Fehler erscheint erst, wenn seit 10 Sekunden keine gültigen
+    // MQTT-Vibrationswerte angekommen sind. Beim Marker-Verlust bleibt das
+    // gesamte AR-Overlay (einschließlich Fehler) ausgeblendet.
+    function refreshMQTTHealth() {
+      const referenceTime = lastVibrationAt || mqttStartAt;
+      const missingData = Date.now() - referenceTime >= MQTT_DATA_TIMEOUT_MS;
+      moduleData.error.active = missingData;
+
+      if (missingData) {
+        moduleData.error.code = "MQTT-001";
+        moduleData.error.message = "Keine aktuellen Vibrationsdaten";
+        moduleData.error.cause = !mqttConnected
+          ? "Keine Verbindung zum MQTT-Broker. Bitte Netzwerk und Broker prüfen."
+          : !mqttSubscribed
+            ? "MQTT-Topic konnte nicht abonniert werden."
+            : "Seit mindestens 10 Sekunden kommen keine Messwerte auf /bbk-lf7/16/power-house/vibration an.";
+        vibrationValue.textContent = "–";
+        vibrationUpdated.textContent = "Keine aktuellen Messwerte";
+        setVibrationStatus("error", "Keine Daten");
+      }
+
+      errorButton.style.display = missingData ? "flex" : "none";
+      if (!missingData) errorDetails.style.display = "none";
+      document.getElementById("error-code").textContent = moduleData.error.code;
+      document.getElementById("error-message").textContent = moduleData.error.message;
+      document.getElementById("error-cause").textContent = moduleData.error.cause;
     }
 
     // Sowohl reine Werte (z. B. "2.354") als auch JSON {value: ...} akzeptieren.
@@ -887,6 +846,7 @@
       vibrationValue.textContent = formatted;
       vibrationUpdated.textContent = "Letzter Messwert: " + now.toLocaleTimeString("de-DE");
       setVibrationStatus("live", "Live", "MQTT: " + MQTT_TOPIC + " · " + now.toLocaleTimeString("de-DE"));
+      refreshMQTTHealth();
     }
 
     if (typeof mqtt === "undefined") {
@@ -948,14 +908,10 @@
       });
     }
 
-    // Veraltete Werte niemals als aktuellen Live-Messwert darstellen.
-    setInterval(() => {
-      if (mqttConnected && mqttSubscribed && receivedVibration &&
-          Date.now() - lastVibrationAt > 10000 &&
-          vibrationStatus.dataset.state === "live") {
-        setVibrationStatus("waiting", "Keine neuen Daten", "MQTT verbunden, aber seit 10 Sekunden kein neuer Vibrationswert.");
-      }
-    }, 1000);
+    // Auch beim Öffnen der Seite ohne Messwerte (oder nach einem Ausfall)
+    // den Fehlzustand aktuell halten; keine Test-/Lift-Fehler vortäuschen.
+    refreshMQTTHealth();
+    setInterval(refreshMQTTHealth, 1000);
 
   </script>
 
